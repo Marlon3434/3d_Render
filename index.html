@@ -3,18 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fliegender Würfel</title>
+    <title>Interaktiver Würfel</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f0f0f0;
         }
         canvas {
             display: block;
         }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
+    <div id="container"></div>
+    <button id="randomize">Würfel drehen</button>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
@@ -23,16 +37,17 @@
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+        document.getElementById('container').appendChild(renderer.domElement);
 
-        // Farben für die Würfelseiten definieren
+        // Texturen für die Würfelseiten
+        const loader = new THREE.TextureLoader();
         const materials = [
-            new THREE.MeshBasicMaterial({ color: 0xff0000 }), // rot
-            new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // grün
-            new THREE.MeshBasicMaterial({ color: 0x0000ff }), // blau
-            new THREE.MeshBasicMaterial({ color: 0xffff00 }), // gelb
-            new THREE.MeshBasicMaterial({ color: 0xff00ff }), // magenta
-            new THREE.MeshBasicMaterial({ color: 0x00ffff })  // cyan
+            new THREE.MeshBasicMaterial({ map: loader.load('https://i.imgur.com/3aB3cce.png') }), // 1
+            new THREE.MeshBasicMaterial({ map: loader.load('https://i.imgur.com/XLrCtvM.png') }), // 2
+            new THREE.MeshBasicMaterial({ map: loader.load('https://i.imgur.com/BOji4oa.png') }), // 3
+            new THREE.MeshBasicMaterial({ map: loader.load('https://i.imgur.com/JRTG8Al.png') }), // 4
+            new THREE.MeshBasicMaterial({ map: loader.load('https://i.imgur.com/lUjqjPY.png') }), // 5
+            new THREE.MeshBasicMaterial({ map: loader.load('https://i.imgur.com/rXsqYvB.png') })  // 6
         ];
 
         // Geometrie und Material des Würfels erstellen
@@ -56,6 +71,17 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
+        // Zufällige Drehung des Würfels
+        function randomizeCube() {
+            const randX = Math.random() * 2 * Math.PI;
+            const randY = Math.random() * 2 * Math.PI;
+            const randZ = Math.random() * 2 * Math.PI;
+            gsap.to(cube.rotation, { x: randX, y: randY, z: randZ, duration: 1 });
+        }
+
+        // Button Event Listener
+        document.getElementById('randomize').addEventListener('click', randomizeCube);
+
         // Render-Funktion
         function animate() {
             requestAnimationFrame(animate);
@@ -68,5 +94,6 @@
 
         animate();
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.7.1/gsap.min.js"></script>
 </body>
 </html>
