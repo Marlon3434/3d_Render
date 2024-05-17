@@ -43,12 +43,12 @@
         // Texturen für die Würfelseiten
         const loader = new THREE.TextureLoader();
         const materials = [
-            new THREE.MeshBasicMaterial({ map: loader.load('https://www.zebis.ch/sites/default/files/2021-02/wuerfelbild%201.png') }), // 1
-            new THREE.MeshBasicMaterial({ map: loader.load('https://www.zebis.ch/sites/default/files/2021-02/wuerfelbild%202.png') }), // 2
-            new THREE.MeshBasicMaterial({ map: loader.load('https://www.zebis.ch/sites/default/files/2021-02/wuerfelbild%203.png') }), // 3
-            new THREE.MeshBasicMaterial({ map: loader.load('https://www.zebis.ch/sites/default/files/2021-02/wuerfelbild%204.png') }), // 4
-            new THREE.MeshBasicMaterial({ map: loader.load('https://www.zebis.ch/sites/default/files/2021-02/wuerfelbild%205.png') }), // 5
-            new THREE.MeshBasicMaterial({ map: loader.load('https://www.zebis.ch/sites/default/files/2021-02/wuerfelbild%206.png') })  // 6
+            new THREE.MeshBasicMaterial({ color: 0xff0000 }), // rot
+            new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // grün
+            new THREE.MeshBasicMaterial({ color: 0x0000ff }), // blau
+            new THREE.MeshBasicMaterial({ color: 0xffff00 }), // gelb
+            new THREE.MeshBasicMaterial({ color: 0xff00ff }), // magenta
+            new THREE.MeshBasicMaterial({ color: 0x00ffff })  // cyan
         ];
 
         // Geometrie und Material des Würfels erstellen
