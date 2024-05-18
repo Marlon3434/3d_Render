@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fliegender Würfel</title>
+    <title>Durchsichtige Box mit fallendem Würfel</title>
     <style>
         body {
             margin: 0;
@@ -19,7 +19,7 @@
             width: 100%;
             height: 80vh;
         }
-        #rotate-button {
+        #drop-cube-button {
             margin-top: 20px;
             padding: 10px 20px;
             font-size: 16px;
@@ -32,75 +32,133 @@
 </head>
 <body>
     <div id="container"></div>
-    <button id="rotate-button">Würfel drehen</button>
+    <button id="drop-cube-button">Würfel fallen lassen</button>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ammo.js/0.0.10/ammo.wasm.js"></script>
     <script>
         // Szene, Kamera und Renderer erstellen
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / (window.innerHeight * 0.8), 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight * 0.8);
-        document.getElementById('container').appendChild(renderer.domElement);
+        let scene, camera, renderer, controls, physicsWorld, tmpTrans;
+        const clock = new THREE.Clock();
+        const rigidBodies = [];
+        const margin = 0.05;
 
-        // Farben für die Würfelseiten definieren
-        const materials = [
-            new THREE.MeshBasicMaterial({ color: 0xff0000 }), // rot
-            new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // grün
-            new THREE.MeshBasicMaterial({ color: 0x0000ff }), // blau
-            new THREE.MeshBasicMaterial({ color: 0xffff00 }), // gelb
-            new THREE.MeshBasicMaterial({ color: 0xff00ff }), // magenta
-            new THREE.MeshBasicMaterial({ color: 0x00ffff })  // cyan
-        ];
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / (window.innerHeight * 0.8), 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight * 0.8);
+            document.getElementById('container').appendChild(renderer.domElement);
 
-        // Geometrie und Material des Würfels erstellen
-        const geometry = new THREE.BoxGeometry();
-        const cube = new THREE.Mesh(geometry, materials);
-        scene.add(cube);
+            // Transparente Box
+            const boxGeometry = new THREE.BoxGeometry(5, 5, 5);
+            const boxMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ff00,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.2
+            });
+            const box = new THREE.Mesh(boxGeometry, boxMaterial);
+            scene.add(box);
 
-        // Kamera Position setzen
-        camera.position.z = 5;
+            // Kamera Position setzen
+            camera.position.z = 10;
 
-        // OrbitControls für Maus- und Touchsteuerung hinzufügen
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; // Trägheit aktivieren
-        controls.dampingFactor = 0.25; // Dämpfungsfaktor
-        controls.enableZoom = false; // Zoom deaktivieren
-        controls.minPolarAngle = -Infinity; // Unbegrenzte Vertikaldrehung
-        controls.maxPolarAngle = Infinity;  // Unbegrenzte Vertikaldrehung
+            // OrbitControls für Maus- und Touchsteuerung hinzufügen
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.25;
+            controls.enableZoom = true;
 
-        // Funktion zum Drehen des Würfels auf eine zufällige Seite
-        function rotateCubeRandomly() {
-            // Zufällige Endrotationen für eine der sechs Seiten des Würfels
-            const possibleRotations = [
-                { x: 0, y: 0, z: 0 },
-                { x: Math.PI / 2, y: 0, z: 0 },
-                { x: -Math.PI / 2, y: 0, z: 0 },
-                { x: Math.PI, y: 0, z: 0 },
-                { x: 0, y: Math.PI / 2, z: 0 },
-                { x: 0, y: -Math.PI / 2, z: 0 }
+            // Physik initialisieren
+            tmpTrans = new Ammo.btTransform();
+            setupPhysicsWorld();
+
+            // Licht hinzufügen
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(10, 10, 10).normalize();
+            scene.add(light);
+
+            // Render-Funktion
+            animate();
+        }
+
+        function setupPhysicsWorld() {
+            const collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
+            const dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration);
+            const broadphase = new Ammo.btDbvtBroadphase();
+            const solver = new Ammo.btSequentialImpulseConstraintSolver();
+            physicsWorld = new Ammo.btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
+            physicsWorld.setGravity(new Ammo.btVector3(0, -9.81, 0));
+        }
+
+        function createPhysicsCube() {
+            // Farben für die Würfelseiten definieren
+            const materials = [
+                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // rot
+                new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // grün
+                new THREE.MeshBasicMaterial({ color: 0x0000ff }), // blau
+                new THREE.MeshBasicMaterial({ color: 0xffff00 }), // gelb
+                new THREE.MeshBasicMaterial({ color: 0xff00ff }), // magenta
+                new THREE.MeshBasicMaterial({ color: 0x00ffff })  // cyan
             ];
-            
-            // Aktuelle Rotation berücksichtigen und eine zufällige Rotation auswählen
-            const currentRotation = cube.rotation;
-            const randomRotation = possibleRotations[Math.floor(Math.random() * possibleRotations.length)];
-            const targetRotation = {
-                x: currentRotation.x + randomRotation.x,
-                y: currentRotation.y + randomRotation.y,
-                z: currentRotation.z + randomRotation.z
-            };
 
-            // Sanftes Drehen des Würfels
-            new TWEEN.Tween(cube.rotation)
-                .to(targetRotation, 3000) // Dauer auf 3000 ms setzen
-                .easing(TWEEN.Easing.Elastic.Out)
-                .start();
+            // Geometrie und Material des Würfels erstellen
+            const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+            const cube = new THREE.Mesh(cubeGeometry, materials);
+            scene.add(cube);
+
+            // Physik für den Würfel erstellen
+            const transform = new Ammo.btTransform();
+            transform.setIdentity();
+            transform.setOrigin(new Ammo.btVector3(0, 5, 0));
+            const motionState = new Ammo.btDefaultMotionState(transform);
+
+            const colShape = new Ammo.btBoxShape(new Ammo.btVector3(0.5, 0.5, 0.5));
+            colShape.setMargin(margin);
+
+            const localInertia = new Ammo.btVector3(0, 0, 0);
+            colShape.calculateLocalInertia(1, localInertia);
+
+            const rbInfo = new Ammo.btRigidBodyConstructionInfo(1, motionState, colShape, localInertia);
+            const body = new Ammo.btRigidBody(rbInfo);
+
+            physicsWorld.addRigidBody(body);
+            cube.userData.physicsBody = body;
+            rigidBodies.push(cube);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const deltaTime = clock.getDelta();
+            updatePhysics(deltaTime);
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function updatePhysics(deltaTime) {
+            physicsWorld.stepSimulation(deltaTime, 10);
+
+            for (let i = 0; i < rigidBodies.length; i++) {
+                const objThree = rigidBodies[i];
+                const objAmmo = objThree.userData.physicsBody;
+                const ms = objAmmo.getMotionState();
+                if (ms) {
+                    ms.getWorldTransform(tmpTrans);
+                    const p = tmpTrans.getOrigin();
+                    const q = tmpTrans.getRotation();
+                    objThree.position.set(p.x(), p.y(), p.z());
+                    objThree.quaternion.set(q.x(), q.y(), q.z(), q.w());
+                }
+            }
         }
 
         // Event-Listener für den Button
-        document.getElementById('rotate-button').addEventListener('click', rotateCubeRandomly);
+        document.getElementById('drop-cube-button').addEventListener('click', createPhysicsCube);
 
         // Fenstergrößenänderung behandeln
         window.addEventListener('resize', () => {
@@ -109,20 +167,10 @@
             renderer.setSize(window.innerWidth, window.innerHeight * 0.8);
         });
 
-        // Render-Funktion
-        function animate(time) {
-            requestAnimationFrame(animate);
-
-            // Tween-Updates für sanfte Animationen
-            TWEEN.update(time);
-
-            // Steuerungen aktualisieren
-            controls.update();
-
-            renderer.render(scene, camera);
-        }
-
-        animate();
+        // Initialisierung
+        Ammo().then(() => {
+            init();
+        });
     </script>
 </body>
 </html>
