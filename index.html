@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interaktiver Würfel</title>
+    <title>Fliegender Würfel</title>
     <style>
         body {
             margin: 0;
@@ -13,36 +13,38 @@
             align-items: center;
             justify-content: center;
             height: 100vh;
-            background-color: #f0f0f0;
+        }
+        #container {
+            position: relative;
+            width: 100%;
+            height: 80vh;
+        }
+        #rotate-button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
         }
         canvas {
             display: block;
-        }
-        button {
-            margin-top: 20px;
-            margin-bottom: 80px;
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #f0f0f0;
-            cursor: pointer;
         }
     </style>
 </head>
 <body>
     <div id="container"></div>
-    <button id="randomize">Würfel drehen</button>
+    <button id="rotate-button">Würfel drehen</button>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
         // Szene, Kamera und Renderer erstellen
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / (window.innerHeight * 0.8), 0.1, 1000);
         const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(window.innerWidth, window.innerHeight * 0.8);
         document.getElementById('container').appendChild(renderer.domElement);
 
-        // Texturen für die Würfelseiten
-        const loader = new THREE.TextureLoader();
+        // Farben für die Würfelseiten definieren
         const materials = [
             new THREE.MeshBasicMaterial({ color: 0xff0000 }), // rot
             new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // grün
@@ -65,24 +67,26 @@
         controls.enableDamping = true; // Trägheit aktivieren
         controls.dampingFactor = 0.25; // Dämpfungsfaktor
         controls.enableZoom = false; // Zoom deaktivieren
+        controls.minPolarAngle = -Infinity; // Unbegrenzte Vertikaldrehung
+        controls.maxPolarAngle = Infinity;  // Unbegrenzte Vertikaldrehung
+
+        // Funktion zum Drehen des Würfels auf eine zufällige Seite
+        function rotateCubeRandomly() {
+            const randomX = Math.floor(Math.random() * 4) * (Math.PI / 2);
+            const randomY = Math.floor(Math.random() * 4) * (Math.PI / 2);
+            const randomZ = Math.floor(Math.random() * 4) * (Math.PI / 2);
+            cube.rotation.set(randomX, randomY, randomZ);
+        }
+
+        // Event-Listener für den Button
+        document.getElementById('rotate-button').addEventListener('click', rotateCubeRandomly);
 
         // Fenstergrößenänderung behandeln
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.aspect = window.innerWidth / (window.innerHeight * 0.8);
             camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setSize(window.innerWidth, window.innerHeight * 0.8);
         });
-
-        // Zufällige Drehung des Würfels
-        function randomizeCube() {
-            const randX = Math.random() * 2 * Math.PI;
-            const randY = Math.random() * 2 * Math.PI;
-            const randZ = Math.random() * 2 * Math.PI;
-            gsap.to(cube.rotation, { x: randX, y: randY, z: randZ, duration: 1 });
-        }
-
-        // Button Event Listener
-        document.getElementById('randomize').addEventListener('click', randomizeCube);
 
         // Render-Funktion
         function animate() {
@@ -96,6 +100,5 @@
 
         animate();
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.7.1/gsap.min.js"></script>
 </body>
 </html>
