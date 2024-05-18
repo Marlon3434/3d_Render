@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Durchsichtige Box mit fallendem Würfel</title>
+    <title>Box mit fallendem Würfel</title>
     <style>
         body {
             margin: 0;
@@ -13,14 +13,13 @@
             align-items: center;
             justify-content: center;
             height: 100vh;
-            background-color: #f0f0f0; /* Hintergrundfarbe */
         }
         #container {
             position: relative;
             width: 100%;
             height: 80vh;
         }
-        #drop-cube-button {
+        #add-cube-button {
             margin-top: 20px;
             padding: 10px 20px;
             font-size: 16px;
@@ -33,151 +32,127 @@
 </head>
 <body>
     <div id="container"></div>
-    <button id="drop-cube-button">Würfel fallen lassen</button>
-    
+    <button id="add-cube-button">Würfel hinzufügen</button>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ammo.js/0.0.10/ammo.wasm.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/libs/ammo.wasm.js"></script>
     <script>
         // Szene, Kamera und Renderer erstellen
-        let scene, camera, renderer, controls, physicsWorld, tmpTrans;
-        const clock = new THREE.Clock();
-        const rigidBodies = [];
-        const margin = 0.05;
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / (window.innerHeight * 0.8), 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight * 0.8);
+        document.getElementById('container').appendChild(renderer.domElement);
 
-        function init() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / (window.innerHeight * 0.8), 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight * 0.8);
-            document.getElementById('container').appendChild(renderer.domElement);
+        // Transparentes Box-Material erstellen
+        const boxGeometry = new THREE.BoxGeometry(10, 10, 10);
+        const boxMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ff00,
+            transparent: true,
+            opacity: 0.1,
+            wireframe: true
+        });
+        const box = new THREE.Mesh(boxGeometry, boxMaterial);
+        scene.add(box);
 
-            // Transparente Box
-            const boxGeometry = new THREE.BoxGeometry(5, 5, 5);
-            const boxEdges = new THREE.EdgesGeometry(boxGeometry);
-            const boxMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
-            const box = new THREE.LineSegments(boxEdges, boxMaterial);
-            scene.add(box);
+        // Kamera Position setzen
+        camera.position.z = 15;
 
-            const boxMeshMaterial = new THREE.MeshBasicMaterial({
-                color: 0x00ff00,
-                transparent: true,
-                opacity: 0.1,
-                side: THREE.DoubleSide
+        // OrbitControls für Maus- und Touchsteuerung hinzufügen
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.25;
+        controls.enableZoom = true;
+
+        // Ammo.js Physik initialisieren
+        Ammo().then(() => {
+            // Physik-Welt erstellen
+            const physicsWorld = new Ammo.btDiscreteDynamicsWorld(
+                new Ammo.btDefaultCollisionConfiguration(),
+                new Ammo.btCollisionDispatcher(new Ammo.btDefaultCollisionConfiguration()),
+                new Ammo.btDbvtBroadphase(),
+                new Ammo.btSequentialImpulseConstraintSolver()
+            );
+            physicsWorld.setGravity(new Ammo.btVector3(0, -9.81, 0));
+
+            // Funktion zum Erstellen eines fallenden Würfels
+            function createFallingCube() {
+                const cubeSize = 1;
+                const cubeGeometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+                const cubeMaterials = [
+                    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+                    new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+                    new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+                    new THREE.MeshBasicMaterial({ color: 0xffff00 }),
+                    new THREE.MeshBasicMaterial({ color: 0xff00ff }),
+                    new THREE.MeshBasicMaterial({ color: 0x00ffff })
+                ];
+                const cube = new THREE.Mesh(cubeGeometry, cubeMaterials);
+
+                // Startposition des Würfels über der Box
+                cube.position.set(0, 5, 0);
+                scene.add(cube);
+
+                // Physik für den Würfel erstellen
+                const transform = new Ammo.btTransform();
+                transform.setIdentity();
+                transform.setOrigin(new Ammo.btVector3(cube.position.x, cube.position.y, cube.position.z));
+
+                const motionState = new Ammo.btDefaultMotionState(transform);
+
+                const colShape = new Ammo.btBoxShape(new Ammo.btVector3(cubeSize * 0.5, cubeSize * 0.5, cubeSize * 0.5));
+                const localInertia = new Ammo.btVector3(0, 0, 0);
+                colShape.calculateLocalInertia(1, localInertia);
+
+                const rbInfo = new Ammo.btRigidBodyConstructionInfo(1, motionState, colShape, localInertia);
+                const body = new Ammo.btRigidBody(rbInfo);
+
+                physicsWorld.addRigidBody(body);
+
+                cube.userData.physicsBody = body;
+                physicsObjects.push(cube);
+            }
+
+            const physicsObjects = [];
+
+            // Event-Listener für den Button
+            document.getElementById('add-cube-button').addEventListener('click', createFallingCube);
+
+            // Fenstergrößenänderung behandeln
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / (window.innerHeight * 0.8);
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight * 0.8);
             });
-            const boxMesh = new THREE.Mesh(boxGeometry, boxMeshMaterial);
-            scene.add(boxMesh);
-
-            // Kamera Position setzen
-            camera.position.z = 10;
-
-            // OrbitControls für Maus- und Touchsteuerung hinzufügen
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.25;
-            controls.enableZoom = true;
-
-            // Physik initialisieren
-            tmpTrans = new Ammo.btTransform();
-            setupPhysicsWorld();
-
-            // Licht hinzufügen
-            const ambientLight = new THREE.AmbientLight(0x404040); // weiches Umgebungslicht
-            scene.add(ambientLight);
-
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-            directionalLight.position.set(10, 10, 10).normalize();
-            scene.add(directionalLight);
 
             // Render-Funktion
-            animate();
-        }
+            function animate() {
+                requestAnimationFrame(animate);
 
-        function setupPhysicsWorld() {
-            const collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
-            const dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration);
-            const broadphase = new Ammo.btDbvtBroadphase();
-            const solver = new Ammo.btSequentialImpulseConstraintSolver();
-            physicsWorld = new Ammo.btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
-            physicsWorld.setGravity(new Ammo.btVector3(0, -9.81, 0));
-        }
+                // Physik-Update
+                const deltaTime = 1 / 60;
+                physicsWorld.stepSimulation(deltaTime, 10);
 
-        function createPhysicsCube() {
-            // Farben für die Würfelseiten definieren
-            const materials = [
-                new THREE.MeshBasicMaterial({ color: 0xff0000 }), // rot
-                new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // grün
-                new THREE.MeshBasicMaterial({ color: 0x0000ff }), // blau
-                new THREE.MeshBasicMaterial({ color: 0xffff00 }), // gelb
-                new THREE.MeshBasicMaterial({ color: 0xff00ff }), // magenta
-                new THREE.MeshBasicMaterial({ color: 0x00ffff })  // cyan
-            ];
-
-            // Geometrie und Material des Würfels erstellen
-            const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-            const cube = new THREE.Mesh(cubeGeometry, materials);
-            scene.add(cube);
-
-            // Physik für den Würfel erstellen
-            const transform = new Ammo.btTransform();
-            transform.setIdentity();
-            transform.setOrigin(new Ammo.btVector3(0, 5, 0));
-            const motionState = new Ammo.btDefaultMotionState(transform);
-
-            const colShape = new Ammo.btBoxShape(new Ammo.btVector3(0.5, 0.5, 0.5));
-            colShape.setMargin(margin);
-
-            const localInertia = new Ammo.btVector3(0, 0, 0);
-            colShape.calculateLocalInertia(1, localInertia);
-
-            const rbInfo = new Ammo.btRigidBodyConstructionInfo(1, motionState, colShape, localInertia);
-            const body = new Ammo.btRigidBody(rbInfo);
-
-            physicsWorld.addRigidBody(body);
-            cube.userData.physicsBody = body;
-            rigidBodies.push(cube);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-
-            const deltaTime = clock.getDelta();
-            updatePhysics(deltaTime);
-
-            controls.update();
-            renderer.render(scene, camera);
-        }
-
-        function updatePhysics(deltaTime) {
-            physicsWorld.stepSimulation(deltaTime, 10);
-
-            for (let i = 0; i < rigidBodies.length; i++) {
-                const objThree = rigidBodies[i];
-                const objAmmo = objThree.userData.physicsBody;
-                const ms = objAmmo.getMotionState();
-                if (ms) {
-                    ms.getWorldTransform(tmpTrans);
-                    const p = tmpTrans.getOrigin();
-                    const q = tmpTrans.getRotation();
-                    objThree.position.set(p.x(), p.y(), p.z());
-                    objThree.quaternion.set(q.x(), q.y(), q.z(), q.w());
+                for (let obj of physicsObjects) {
+                    const objBody = obj.userData.physicsBody;
+                    const ms = objBody.getMotionState();
+                    if (ms) {
+                        ms.getWorldTransform(transform);
+                        const p = transform.getOrigin();
+                        const q = transform.getRotation();
+                        obj.position.set(p.x(), p.y(), p.z());
+                        obj.quaternion.set(q.x(), q.y(), q.z(), q.w());
+                    }
                 }
+
+                // Steuerungen aktualisieren
+                controls.update();
+
+                renderer.render(scene, camera);
             }
-        }
 
-        // Event-Listener für den Button
-        document.getElementById('drop-cube-button').addEventListener('click', createPhysicsCube);
-
-        // Fenstergrößenänderung behandeln
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / (window.innerHeight * 0.8);
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight * 0.8);
-        });
-
-        // Initialisierung
-        Ammo().then(() => {
-            init();
+            animate();
         });
     </script>
 </body>
